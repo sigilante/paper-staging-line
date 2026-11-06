@@ -1,0 +1,761 @@
+% Logical Methods in Computer Science.  With lmcs.cls on the TeX path this builds
+% in the LMCS class; otherwise it falls back to article so the draft still builds.
+\IfFileExists{lmcs.cls}{%
+  \documentclass{lmcs}\def\lmcsclass{}}{%
+  \documentclass[11pt]{article}\usepackage[margin=1.1in]{geometry}}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[numbers]{natbib}
+\usepackage{booktabs}
+\usepackage{microtype}
+\ifdefined\lmcsclass\else
+  \usepackage{hyperref}
+  \providecommand{\keywords}[1]{\par\noindent\textbf{Keywords.} #1\par}
+\fi
+\ifdefined\lmcsclass
+  % LMCS predefines its theorem environments; ours are aliases, sharing its numbering.
+  \newenvironment{theorem}{\thm}{\endthm}
+  \newenvironment{lemma}{\lem}{\endlem}
+  \newenvironment{proposition}{\prop}{\endprop}
+  \newenvironment{corollary}{\cor}{\endcor}
+  \newenvironment{definition}{\defi}{\enddefi}
+  \newenvironment{remark}{\rem}{\endrem}
+\else
+  \theoremstyle{plain}
+  \newtheorem{theorem}{Theorem}[section]
+  \newtheorem{lemma}[theorem]{Lemma}
+  \newtheorem{proposition}[theorem]{Proposition}
+  \newtheorem{corollary}[theorem]{Corollary}
+  \theoremstyle{definition}
+  \newtheorem{definition}[theorem]{Definition}
+  \theoremstyle{remark}
+  \newtheorem{remark}[theorem]{Remark}
+\fi
+\newcommand{\code}[1]{\langle #1\rangle}
+\newcommand{\red}{\twoheadrightarrow}
+\newcommand{\hred}{\twoheadrightarrow_{h}}
+\newcommand{\lean}[1]{\texttt{#1}}
+\newcommand{\fn}[1]{\textup{#1}}  % named terms: upright everywhere, even in theorem statements
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\F}{\mathsf{F}}
+\newcommand{\num}[1]{\underline{#1}}
+\newcommand{\Nat}{\mathtt{Nat}}
+\newcommand{\Bool}{\mathtt{Bool}}
+
+\newcommand{\theabstract}{%
+In weak combinatory logic over $\{S,K,I\}$ no term quotes every term, so a staged
+language built on it fixes quotation at compile time.  We read that discipline as the
+S4 necessity modality of Davies--Pfenning and Kavvos, and ask where a
+\emph{behavioral lift} exists: a closed term that sends a live value to a code
+agreeing with it, an instance of Kavvos' Q-coalgebras and a weak substitute for the
+missing unit.  The answer depends on where the value must be total.  A lift exists at
+$\Bool\to\Bool$ under totality on the booleans; provably none exists at $\Nat\to\Bool$
+under totality on the numerals.  Under a modulus, an operational
+form of totality on a compact point set, a lift exists at $\Nat\to\Bool$ by search
+over $\mathbb{N}_\infty$ and at $(\Nat\to\Bool)\to\Bool$ by Berger's search over
+Cantor space.  Totality at the point at infinity suffices for $\Nat\to\Bool$, and
+totality on every point of Cantor space suffices in an oracle semantics; totality on
+the definable streams does not, by a Kleene tree built inside the calculus.  The staging
+line for behavioral lift is therefore drawn at compactness of the point set on which
+totality is demanded, namely Escard\'o's boundary for decidable equality.  We construct
+the modal reading and produce constructions in weak combinatory logic and a
+compactness observation.  All results are mechanized in Lean~4.}
+
+\begin{document}
+
+\ifdefined\lmcsclass
+  \title[The staging line is compactness]{The Staging Line Is
+    Compactness: Behavioral Reification in Weak Combinatory Logic}
+  \titlecomment{All results are mechanized in Lean~4 (\texttt{lean-ski}).}
+  \author[N.~E.~Davis]{N.~E.~Davis}[a]
+  \address{ZeroAttest, Champaign, Illinois}
+  \keywords{combinatory logic, staging, modal type theory, reification, exhaustible sets,
+  fan theorem, Kleene tree, Lean}
+  \begin{abstract}\theabstract\end{abstract}
+  \maketitle
+\else
+  \title{The Staging Line Is Compactness\\[2pt]\large Behavioral reification in weak
+    combinatory logic\\[2pt]\normalsize(working draft, LMCS format pending \texttt{lmcs.cls})}
+  \author{N.\ E.\ Davis}
+  \date{}
+  \maketitle
+  \begin{abstract}\theabstract\end{abstract}
+  \keywords{combinatory logic, staging, modal type theory, reification, exhaustible sets,
+  fan theorem, Kleene tree, Lean}
+\fi
+
+
+\section{Introduction}\label{sec:intro}
+A language whose instruction set is $\{S,K,I\}$ cannot quote at run time: no closed
+term $Q$ has $Q\,M \red \code{M}$ for every $M$
+\citep{Barendregt1991,DavisMeta} (\lean{no\_quote}).  The declarative $SKI$ ``assembly
+language'' SKIjack \citep{skijack}
+therefore makes quotation a compile-time construct, and checks that four surface
+positions (equality operands, quotation arguments, namespace keys and scry paths)
+hold data, not functions.  Davies and Pfenning \citep{DaviesPfenning2001} read
+staging as S4 necessity, and Kavvos \citep{Kavvos2017} develops intensional
+recursion in that frame for untyped $\lambda$, where evaluation and code-for-code
+are definable and only quoting is not.  Section~\ref{sec:modality} places SKIjack's
+discipline in the same frame, with the comonad's structure maps mechanized over
+$\{S,K,I\}$.
+
+While the syntactic unit is impossible, a weaker one need not be.  A \emph{behavioral}
+lift sends a live value to the code of \emph{some} term that behaves as it does.
+We call the boundary between the live values lifted to codes by some closed term and those
+lifted by no closed term the \emph{staging line}.
+Davies and Pfenning remark that a lift $A \to \Box A$ exists exactly when every
+arrow of $A$ is under a box \citep[\S5.3]{DaviesPfenning2001}, a criterion suited to
+structural copies.  MetaML forbids lifting functions by design
+\citep{TahaSheard2000}, and type-directed partial evaluation reaches sums only
+with control and stops at inductive types \citep{Danvy1996}.  We show, inside weak
+combinatory logic and with mechanized proofs, that the behavioral question has a
+different answer, one that turns on where the value must be total
+(Table~\ref{tab:results}).
+\begin{table}[tb]\centering\footnotesize
+\caption{behavioral lifts, by type and by where totality is demanded.}\label{tab:results}
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & totality on a non-compact point set & totality on a compact point set \\
+\midrule
+$\Bool\to\Bool$ & --- & lift (Thm.~\ref{thm:bool}) \\
+$\Nat\to\Bool$ & $\mathbb{N}$: no lift (Thm.~\ref{thm:nolift}) & $\mathbb{N}_\infty$: lift (Thms.~\ref{thm:nat}, \ref{thm:natfan}) \\
+$(\Nat\to\Bool)\to\Bool$ & definable streams: no lift (Thm.~\ref{thm:ctotal}) & all points: lift$^\ddagger$ (Thms.~\ref{thm:cantor}, \ref{thm:ofan}) \\
+\bottomrule
+\end{tabular}\\[2pt]
+{\footnotesize $^\ddagger$in an oracle semantics, by the classical fan theorem.}
+\end{table}
+A function has a \emph{modulus} when it reads its argument only to a bounded
+depth: boundedly many successor layers of a numeral, or boundedly many bits of a
+stream.  A modulus is an operational form of totality on a compact point set:
+it asks for a value on every term that agrees with a point up to a finite depth.
+For $\Nat\to\Bool$ the points correspond to $\mathbb{N}_\infty$, the naturals with a
+point at infinity; for $(\Nat\to\Bool)\to\Bool$ they are the points of Cantor space,
+the infinite boolean sequences $\alpha:\mathbb{N}\to\Bool$, of which terms define only
+countably many.
+Totality on the numerals does not demand a value at $\infty$, and under that
+hypothesis no lift exists (Theorem~\ref{thm:nolift}).
+
+The failure is sharp: one function that is total on every numeral but has no value at
+$\infty$, added to the functions with a modulus, defeats every lift
+(Theorem~\ref{thm:sharp}).  The obstruction is intensional; extensionally, the
+functions with a modulus are eventually constant and the witness is constantly false.
+The \emph{staging line} can be read as the compactness of the point set on which
+totality is demanded. This recapitulates Escard\'o's boundary between compact and
+discrete types for decidable equality \citep[Thm.~4.13]{Escardo2008}, but for code
+extraction.  % We offer the reading as an observation, not a classification; what we
+% prove is each cell of the table above.
+% We prove each cell of Table~\ref{tab:results}.
+
+\paragraph{Contributions.}
+\begin{enumerate}
+\item The S4 reading of compile-time quotation in $\{S,K,I\}$, with re-encoding and
+  intensional fixed points mechanized, and a definition of behavioral lift
+  parameterized by a hypothesis and a set of test inputs (\S\ref{sec:staging}).
+\item Lifts from a modulus, inside weak combinatory logic: at $\Bool\to\Bool$, at
+  $\Nat\to\Bool$, and at Cantor space, each returning a canonical code and each
+  idempotent, so that Kavvos' second coalgebra law holds up to conversion and fails
+  at his $\sim$ (\S\ref{sec:modulus}).
+\item When totality yields a modulus (\S\ref{sec:fan}): on the numerals it does not,
+  and no lift exists, by a stuttering simulation; on the points of $\mathbb{N}_\infty$
+  it does outright; on the definable streams it does not, by a Kleene tree built
+  inside the calculus; and on all points of Cantor space it does, in an oracle
+  semantics.
+\item Consequences for a staged language's data rule, including a fix to SKIjack's
+  checker (\S\ref{sec:skijack}).
+\end{enumerate}
+Every result is mechanized in Lean~4 against \texttt{lean-ski} \citep{leanski}
+(\S\ref{sec:mech}).  The
+ingredients are known: finite tabulation \citep{AltenkirchUustalu2004}, Berger's
+search \citep{Berger1990} and Escard\'o's account of it
+\citep{Escardo2007,Escardo2008}, and the continuity argument behind finite
+identification \citep{Balbach2020}.  Section~\ref{sec:related} says what is theirs.
+
+%% ---------------------------------------------------------------------------
+\section{Preliminaries}\label{sec:prelim}
+
+\paragraph{Terms and reduction.}  Terms are $S$, $K$, $I$ and applications
+$t\,u$, associating to the left; all terms are closed.  Weak reduction $\red$ is the
+reflexive--transitive closure of $S\,f\,g\,x \to f\,x\,(g\,x)$, $K\,x\,y \to x$,
+$I\,x \to x$ anywhere in a term.  Head reduction $\hred$ contracts only at the head
+of the spine.  A term is in weak head normal form when its head combinator has too
+few arguments to contract.  We use three standard facts, all mechanized:
+Church--Rosser for $\red$ \citep[Thm.~2.15]{HindleySeldin2008} (\lean{church\_rosser});
+a form of standardization \citep[\S11B3]{CHS1972}, \citep[Rem.~3.24]{HindleySeldin2008},
+by which every weak reduction to a weak head normal form yields a head reduction to
+one (\lean{eval\_back}, \lean{Compose.eval\_K\_iff}); and determinism of head
+reduction, which is immediate because a term has at most one head redex.
+
+\paragraph{Booleans, numerals, streams, codes.}  $\T = K$ and $\F = K\,I$; they are
+normal and distinct, so by Church--Rosser no term reduces to both.  A boolean
+selects: $\T\,x\,y \red x$ and $\F\,x\,y \red y$.  Scott numerals are
+$\num{0} = K$ and $\num{m+1} = \fn{Succ}\,\num{m}$ with
+$\fn{Succ} = S\,(K\,K)\,(S\,(K\,(S\,I))\,K)$, so that
+$\fn{Succ}\,x\,z\,s \hred s\,(K\,x\,s) \red s\,x$.  Streams are Scott pairs:
+$\fn{Cons}\,h\,t\,k \red k\,h\,t$, with $\fn{Hd}\,s = s\,\T$ and
+$\fn{Tl}\,s = s\,\F$.  The code $\code{t}$ of a term is its Scott encoding over the
+object type $S \mid K \mid I \mid \fn{App}$ with four continuations
+(\lean{quoteT}), so $\code{f\,a} = \fn{App}\,\code{f}\,\code{a}$ literally.  For a
+fixed code $c$, a term $\fn{EqT}_c$ decides equality with $c$:
+$\fn{EqT}_c\,\code{d}\red(c = d)$.  We build it by recursion on $c$ in the
+metalanguage (\lean{eqT\_spec}).
+
+\paragraph{Recursion.}  Recursive terms are fixed points of a step function $F$,
+written $\fn{FixSelf}\,F\,z$ after \texttt{lean-ski}.  Each unrolling wraps the
+self-reference in one more $I$, so the self-references are not syntactically equal;
+the invariant is that each still head-reduces to $\fn{FixB}\,F$
+(\lean{fixSelf\_unroll}).
+
+\paragraph{Infinite numerals.}  Let $\omega$ range over the self-references
+$\fn{FixSelf}\,\fn{Succ}\,z$ with $z \hred \fn{FixB}\,\fn{Succ}$:
+the \emph{infinite numerals}.  With two arguments,
+$\omega\,a\,s \hred s\,(K\,\omega'\,s)$ for another infinite numeral $\omega'$, in
+one explicit step followed by a head reduction (\lean{omega\_steps}), exactly as
+$\num{m+1}\,a\,s\hred s\,(K\,\num{m}\,s)$; with fewer arguments $\omega$ reaches a
+weak head normal form other than $K$ (\lean{omega\_whnf0}, \lean{omega\_whnf1}).
+
+\paragraph{Prefixes and layers.}  A term $s$ \emph{has the prefix}
+$w = b_0\cdots b_{k-1}$ when $s \red \fn{Cons}\,b_0\,s_1$,
+$s_1 \red \fn{Cons}\,b_1\,s_2$, \dots, $s_{k-1}\red \fn{Cons}\,b_{k-1}\,s_k$
+for some $s_i$, the last tail arbitrary (\lean{HasPrefix}).  A term $n$ \emph{has at
+least $m$ layers} when $n \red \fn{Succ}\,n_1$, $n_1\red\fn{Succ}\,n_2$,
+\dots, $m$ times, the last tail arbitrary (\lean{AtLeast}).  Both are closed under
+backward reduction, and $\num{c}$ has at least $m$ layers when $c \ge m$.
+
+%% ---------------------------------------------------------------------------
+\section{Staging and behavioral lifts}\label{sec:staging}
+Compile-time quotation makes $\Box$ a comonad without a unit (\S\ref{sec:modality}).
+A behavioral lift is a weak substitute for the missing unit (\S\ref{sec:lift}).
+\subsection{The staging modality}\label{sec:modality}
+S4 is the modal logic with the axioms T, $\Box A\to A$ (what is necessary is true),
+and 4, $\Box A\to\Box\Box A$ (if something is necessary, it is necessarily necessary).
+Davies and Pfenning read $\Box A$ as codes of terms of type $A$
+\citep{DaviesPfenning2001}: T is then evaluation of code, and 4 re-encodes a code as
+the code of that code.  The converse of T, $A\to\Box A$, which S4 does not prove,
+would quote a live value.  Over $\{S,K,I\}$ the first two are definable and the
+third is not (Table~\ref{tab:s4}).
+\begin{table}[htb]\centering\footnotesize
+\caption{The S4 reading of staging, and what $\{S,K,I\}$ defines.}\label{tab:s4}
+\begin{tabular}{@{}lll@{}}
+\toprule
+axiom & map & over $\{S,K,I\}$ \\
+\midrule
+T: $\Box A\to A$ & unquote, $\varepsilon$ & $\varepsilon\,\code{t}\red t$, definable \\
+4: $\Box A\to\Box\Box A$ & re-encode, $\delta$ & $\delta\,\code{t}\red\code{\code{t}}$, definable (Prop.~\ref{prop:requote}) \\
+converse of T: $A\to\Box A$ & quote, $\eta$ & no closed $Q$ has $Q\,M\red\code{M}$ \citep{Barendregt1991} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+An unquoter
+$\varepsilon : \Box A \to A$ with $\varepsilon\,\code{t} \red t$ is definable
+(e.g., SKIjack encodes one in 43
+atoms \citep{DavisMeta}).  Re-encoding is definable as well since
+it acts on data: \newpage
+\begin{proposition}[\lean{Requote.requote}]\label{prop:requote}
+There is a closed $R$ with $R\,\code{t} \red \code{\code{t}}$ for every $t$.
+\end{proposition}
+\begin{proof}
+$R$ is the fixed point of
+\[
+\lambda r\,q.\ q\,\code{\code{S}}\,\code{\code{K}}\,\code{\code{I}}\,
+(\lambda f\,a.\ \fn{App}'\,(r\,f)\,(r\,a)),
+\]
+where
+$\fn{App}'\,u\,v = \fn{App}\,(\fn{App}\,\code{\fn{App}}\,u)\,v$ is the
+code of an application given the codes of its parts.  Induction on $t$.
+\end{proof}
+So $\varepsilon$ and $\delta = R$ give $\Box$ the structure of a comonad, and the
+unit $\eta : A \to \Box A$, a closed $Q$ with $Q\,M\red\code{M}$, is exactly what no
+term provides \citep{Barendregt1991} (\lean{no\_quote}).  Kavvos
+\citep[\S1.3--1.4]{Kavvos2017} describes the same situation for untyped $\lambda$.
+Self-reference survives the missing unit:
+\begin{theorem}[Intensional fixed points; \lean{Ifix.ifix}, \lean{Ifix.quine}]
+For every $g$ there is $t$ with $t \red g\,\code{t}$.  With $g = I$, $t\red\code{t}$.
+\end{theorem}
+\begin{proof}
+Let $h = \lambda y.\ g\,(\fn{App}\,y\,(R\,y))$ and $t = h\,\code{h}$.  Then
+\[
+t \red g\,(\fn{App}\,\code{h}\,(R\,\code{h})) \red
+g\,(\fn{App}\,\code{h}\,\code{\code{h}}) = g\,\code{h\,\code{h}} = g\,\code{t}.
+\]
+The only quotation is the compile-time code of the closed term $h$.
+\end{proof}
+This is Kavvos' intensional fixed-point rule \citep{Kavvos2017}, realized by
+re-encoding.
+
+\subsection{Behavioral lifts}\label{sec:lift}
+\begin{definition}[Lift]
+Fix a set $X$ of test inputs and a hypothesis $H$ on terms.  A closed term $L$
+\emph{lifts} under $H$ on $X$ when for every $f$ with $H(f)$ there is a term $c$ with
+\[
+L\,f \red \code{c} \qquad\text{and}\qquad
+\forall x\in X,\ \forall r\in\{\T,\F\},\ \ f\,x\red r \implies c\,x \red r.
+\]
+\end{definition}
+The definition is as weak as the informal notion allows: $L$ need work only on terms
+satisfying $H$; $c$ may be any term and need be neither $f$ nor canonical; agreement
+is required only on $X$.
+The impossibility (\S\ref{sec:nolift}) refutes even the weaker form in which
+$L\,f$ and $\code{c}$ need only have a common reduct.  The impossibility is not a corollary of the
+no-quote theorem, which concerns syntax and every term, total or not; the finite lift
+below exists although that theorem holds.
+
+The instances are listed in Table~\ref{tab:results}, with the test inputs for
+$\Bool\to\Bool$ as $\T,\F$ and for $\Nat\to\Bool$ as the numerals.  They are, at Cantor
+space, the terms with a prefix of length $m$ under a modulus, and the definable
+streams under totality.
+
+A \emph{Q-coalgebra} in Kavvos' sense \citep[Def.~33]{Kavvos2017} is a map
+$\alpha : A\to\Box A$ with $\varepsilon\circ\alpha\sim\mathrm{id}$ and
+$\delta\circ\alpha\sim\Box\alpha\circ\alpha$.  The first law, with $\sim$ read as
+agreement on the test inputs, is satisfied by the lifts of \S\ref{sec:modulus}.
+The second law is discussed in \S\ref{sec:coalg}.
+
+%% ---------------------------------------------------------------------------
+\section{Lifts from a modulus}\label{sec:modulus}
+Each lift in this section has the same shape: a search decides properties of the
+function's finite table, a tabulation turns the table into a canonical tree, and the
+lift returns the code of an evaluator for that tree.  The finite case needs no search,
+since its domain is listed.
+
+\subsection{The finite case}\label{sec:bool}
+\begin{theorem}[\lean{LiftBool.lift\_bool}, \lean{lift\_canonical}]\label{thm:bool}
+The term
+\[
+L_{\Bool} = \lambda f.\ f\,\T\,(f\,\F\,\code{K\,K}\,\code{I})\,
+(f\,\F\,\code{\fn{Not}}\,\code{K\,(K\,I)})
+\]
+lifts under totality on $\{\T,\F\}$.
+Functions with the same values get the same code.
+\end{theorem}
+\begin{proof}
+If $f\,\T\red t$ and $f\,\F\red e$, two selections give the code of the canonical
+function with values $t, e$: $K\,K$ (both true), $I$, $\fn{Not}$, or $K\,(K\,I)$
+(both false).  Each agrees with $f$ on $\T$ and $\F$, because a term reaches at
+most one boolean.
+\end{proof}
+This is routine; \citet{AltenkirchUustalu2004} define the same tabulation at every
+finite type, in the metalanguage.
+
+\subsection{At \texorpdfstring{$\Nat\to\Bool$}{Nat -> Bool}}\label{sec:nat}
+\begin{definition}[$m$-local; \lean{NatLift.NLocal}]
+$f$ is \emph{$m$-local} with values $\varphi(0),\dots,\varphi(m)$ when
+$f\,\num{c}\red\varphi(c)$ for $c<m$, and $f\,n\red\varphi(m)$ for every term $n$ with
+at least $m$ layers.
+\end{definition}
+An $m$-local $f$ forces at most $m$ successor layers of its argument, and $f$ has a
+\emph{modulus} when it is $m$-local for some $m$.  An $m$-local $f$ is total on the
+numerals (\lean{nlocal\_total}) and reaches $\varphi(m)$ on an infinite numeral
+(\lean{omega\_atLeast}), so it is total on the points of $\mathbb{N}_\infty$, with
+value $\varphi(m)$ at $\infty$. 
+
+\paragraph{Search.}  Let
+$\fn{Srch}\,p = p\,\num{0}\,\num{0}\,(\fn{Succ}\,(\fn{Srch}\,(p\circ\fn{Succ})))$:
+if $p\,\num 0$ then $\num 0$, else the successor of the search for
+$p\circ\fn{Succ}$.  It builds a lazy numeral, infinite when $p$ is never true.
+\begin{lemma}[Search over $\mathbb{N}_\infty$; \lean{search\_nat}]\label{lem:searchN}
+If $p$ is $m$-local with values $\varphi$, then $p\,(\fn{Srch}\,p)$ reduces to
+$\T$ iff $\varphi(k)$ holds for some $k\le m$, and to $\F$ otherwise.
+\end{lemma}
+\begin{proof}
+Induction on $m$.  For $m=0$, $p$ is constant.  For $m+1$, $p\circ\fn{Succ}$ is
+$m$-local with values $\varphi(\cdot+1)$ (\lean{nlocal\_shift}).  If $\varphi(0)$,
+$\fn{Srch}\,p\red\num 0$ and $p\,\num 0\red\T$.  Otherwise
+$\fn{Srch}\,p\red\fn{Succ}\,(\fn{Srch}\,(p\circ\fn{Succ}))$, and
+$p\,(\fn{Succ}\,x)$ and $(p\circ\fn{Succ})\,x$ have a common reduct, so the
+induction hypothesis and Church--Rosser give the result.
+\end{proof}
+This search corresponds to Escard\'o's for $\mathbb{N}_\infty$ \citep{Escardo2008}
+but run on Scott numerals. $m$-locality lets $p$ terminate on the lazy numeral built
+by the search.
+
+\paragraph{Tabulation.}  The search yields two deciders.  The first,
+$\fn{Every}\,p = \fn{Not}\,(p'\,(\fn{Srch}\,p'))$ with
+$p' = \fn{Not}\circ p$, decides whether $\varphi$ holds at every $k\le m$
+(\lean{everyN\_spec}).  The second,
+$\fn{Const}\,f = \fn{Every}\,(\lambda n.\ \fn{EqB}\,(f\,n)\,(f\,\omega))$,
+decides whether $f$ is constant (\lean{constN\_spec}).  Then
+\[
+\fn{Tree}\,f = \fn{Const}\,f\ (\fn{Leaf}\,(f\,\omega))\ 
+(\fn{Node}\,(f\,\num 0)\,(\fn{Tree}\,(f\circ\fn{Succ})))
+\]
+reduces to a datum $D_m(\varphi)$ defined by recursion on $m$: a leaf of $\varphi(m)$ if
+$\varphi$ is constant on $0..m$, else a node of $\varphi(0)$ and $D_{m-1}(\varphi(\cdot+1))$
+(\lean{treeN\_spec}).  It depends only on $\varphi$ (\lean{DN\_congr}).
+$\fn{Eval}\,d\,n = d\,(\lambda b.\,b)\,(\lambda b\,t.\ n\,b\,(\lambda n'.\ \fn{Eval}\,t\,n'))$
+runs the datum: $\fn{Eval}\,D_m(\varphi)\,\num c\red\varphi(c)$ for $c<m$ and
+$\fn{Eval}\,D_m(\varphi)\,n\red\varphi(m)$ for $n$ with at least $m$ layers
+(\lean{evalN\_spec}).  The structural lift $\fn{LiftTree}$ at the tree's data type
+sends the datum to its own code
+(\lean{liftTreeN\_spec}).
+
+\begin{theorem}[\lean{NatLift.nat\_lift}, \lean{nat\_canonical}]\label{thm:nat}
+The term
+\[
+L_{\Nat} = \lambda f.\ \fn{App}\,\code{\fn{Eval}}\,(\fn{LiftTree}\,(\fn{Tree}\,f))
+\]
+lifts every $m$-local $f$, for every $m$, on the numerals:
+$L_{\Nat}\,f \red \code{\fn{Eval}\,D_m(\varphi)}$, and that term agrees with $f$ on
+every numeral.  Functions with the same values get the same code.
+\end{theorem}
+\begin{proof}
+Compose the lemmas; agreement on $\num c$ with $c\ge m$ uses that $\num c$ has at least
+$m$ layers, and that a term reaches at most one boolean.
+\end{proof}
+
+\subsection{At Cantor space}\label{sec:cantor}
+\begin{definition}[$m$-local, streams; \lean{Search.Local}]
+$q$ is \emph{$m$-local} with table $\varphi : \{\T,\F\}^m\to\{\T,\F\}$ when
+$q\,s \red \varphi(w)$ for every term $s$ with a prefix $w$ of length $m$.
+\end{definition}
+As at $\Nat\to\Bool$, $q$ has a \emph{modulus} when it is $m$-local for some $m$.
+\paragraph{Berger's search.}
+The search \citep{Berger1990} is
+\[
+\fn{Find}\,p = (\lambda l.\ p\,l\,l\,(\fn{Cons}\,\T\,(\fn{Find}\,(p\circ\fn{Cons}\,\T))))\,
+(\fn{Cons}\,\F\,(\fn{Find}\,(p\circ\fn{Cons}\,\F))).
+\]
+\begin{lemma}[\lean{Search.search}, \lean{search\_decides}]\label{lem:search}
+If $p$ is $k$-local with table $\varphi$, then $\fn{Find}\,p$ has a prefix $u$ of
+length $k$, $p\,(\fn{Find}\,p)\red\varphi(u)$, and $\varphi(u)$ holds whenever
+$\varphi$ holds at some word of length $k$.
+\end{lemma}
+\begin{proof}
+Induction on $k$.  For $k=0$, $p$ is constant, so $\fn{Find}\,p$ reduces to one of
+the two cons cells.  For $k+1$, $p\circ\fn{Cons}\,b$ is $k$-local with table
+$\varphi(b\,\cdot)$ (\lean{local\_pre}).  By induction $\fn{Find}\,(p\circ\fn{Cons}\,\F)$
+has a prefix $u_0$, so $l = \fn{Cons}\,\F\,(\cdots)$ has the prefix $\F u_0$, and
+$p\,l\red\varphi(\F u_0)$.  If that is $\T$, $\fn{Find}\,p\red l$.  Otherwise
+$\varphi(\F\,\cdot)$ is constantly $\F$ (by the induction hypothesis for the left
+branch), and $\fn{Find}\,p$ reduces to the right cons cell, whose prefix $\T u_1$
+satisfies $\varphi$ if anything starting with $\T$ does.
+\end{proof}
+We claim no termination of $\fn{Find}$ but do not require it; the lemma asserts
+only that reductions exist.  With sharing, $\fn{Find}\,p$ calls $p$ at most
+$2^{k+1}-1$ times, and a predicate that reads its bits last-first comes close to
+that bound.
+
+\paragraph{Tabulation and lift.}  As in \S\ref{sec:nat}: $\fn{Every}$ and
+$\fn{Const}$ (against the zero stream $0^\omega = \fn{Tab}\,(K\,\F)$) decide universality
+and constancy (\lean{every\_spec}, \lean{const\_spec});
+\[
+\fn{Tree}\,q = \fn{Const}\,q\,(\fn{Leaf}\,(q\,0^\omega))\,
+(\fn{Node}\,(\fn{Tree}\,(q\circ\fn{Cons}\,\F))\,(\fn{Tree}\,(q\circ\fn{Cons}\,\T)))
+\]
+reduces to a datum $D_m(\varphi)$ depending only on $\varphi$ (\lean{tree\_spec},
+\lean{D\_congr}); an evaluator reads the stream's bits down the tree
+(\lean{eval\_spec}); and $\fn{LiftTree}$ sends the tree to its code (\lean{liftTree\_spec}).
+
+\begin{theorem}[\lean{CantorLift.cantor\_lift}, \lean{cantor\_canonical}, \lean{fun\_lift}]\label{thm:cantor}
+The term
+\[
+L_C = \lambda q.\ \fn{App}\,\code{\fn{Eval}}\,(\fn{LiftTree}\,(\fn{Tree}\,q))
+\]
+lifts every $m$-local stream functional, for every $m$, on the terms with a prefix
+of length $m$.  Functionals with the same table get the same code.  The same holds for functionals of functions
+on numerals that read their argument at $0,\dots,m-1$ only, through
+$\fn{Nth}$ and $\fn{Tab}$ (\lean{flocal\_stream}, \lean{tab\_spec}).
+\end{theorem}
+While the search and the tabulation are due to Berger and Escard\'o
+\citep{Berger1990,Escardo2008,EscardoBlog2007}, the short step from them to a finite
+canonical code is, as far as we know, novel.
+
+\subsection{The second coalgebra law}\label{sec:coalg}
+Our lifts satisfy Kavvos' second law up to
+conversion of the quoted terms, but not with his $\sim$ at $\Box\Box A$.  For a lift
+$\alpha$ with $\alpha\,f\red\code{c}$, $\delta(\alpha\,f)\red\code{\code{c}}$ and
+$(\Box\alpha)(\alpha\,f) = \fn{App}\,\code{\alpha}\,(\alpha\,f)\red\code{\alpha\,c}$.  Each of our lifts is
+idempotent on its outputs, $\alpha\,c\red\code{c}$: the output term meets the lift's own
+hypothesis with the same table, and canonicality returns the same code
+(\lean{Coalgebra.bool\_idem}, \lean{nat\_idem}, \lean{cantor\_idem}).  By
+idempotence the two sides of the law are codes of convertible terms
+(\lean{Coalgebra.coalg2}).  Kavvos' $\sim$ at $\Box\Box A$ is stricter.  An object is
+\emph{point-univalent} when its extensionally equal points are intensionally equal
+\citep[Def.~26]{Kavvos2017}, and every object of codes is
+\citep[Lemma~18]{Kavvos2017}, so at $\Box\Box A$ his $\sim$ compares codes as codes.
+The law fails there: $\code{\code{c}}$ and $\code{\alpha\,c}$ are codes of distinct
+terms, and the equality test $\fn{EqT}$ of \S\ref{sec:prelim} separates them.  His results on Q-coalgebras, which assume the
+law at that $\sim$ \citep[Lemmas~19--20, Thms.~30--31]{Kavvos2017}, therefore do not
+apply to our lifts.
+
+%% ---------------------------------------------------------------------------
+\section{Totality and compactness}\label{sec:fan}
+Section~\ref{sec:modulus} lifts every function with a modulus.  This section asks when
+totality gives a modulus.  On the numerals it does not, and no lift exists
+(\S\ref{sec:nolift}, \S\ref{sec:sharp}).  On the points of $\mathbb{N}_\infty$ it does
+outright (\S\ref{sec:natinf}).  At Cantor space it does not on the definable streams,
+and it does on all points in an oracle semantics (\S\ref{sec:fancantor}).  One simulation argument,
+Lemma~\ref{lem:sim} and its generalizations, drives every cell.
+
+\subsection{No lift under totality on the numerals}\label{sec:nolift}
+\begin{theorem}[\lean{NoLift.no\_lift\_conv}]\label{thm:nolift}
+No closed $L$ sends every $f$ total on the numerals to a term with a common reduct
+with a code $\code{c}$ such that $c$ agrees with $f$ on every numeral.
+\end{theorem}
+
+\paragraph{Ingredients.}  Let $G\,c\,n = n\,\F\,(\lambda n'.\ c\,\T\,(\lambda c'.\ G\,c'\,n'))$, which decides
+$n > c$ by walking down both numerals: $G\,\num{j}\,\num{n}\red(j<n)$
+(\lean{G\_num}) and $G\,\omega\,\num{n}\red\F$ for all $n$ (\lean{G\_omega}).  The equality
+test $\fn{EqT}_c$ of \S\ref{sec:prelim} suffices because the proof fixes $c$ first.
+
+\begin{definition}
+$\mathrm{Rel}_b\,t\,t'$ holds when $t'$ is $t$ with some infinite numerals replaced by
+numerals $\num{m}$, $m\ge b$: it is the congruence generated by identity and the pairs
+$(\omega,\num{m})$, $m\ge b$.
+\end{definition}
+
+\begin{lemma}[Stuttering simulation; \lean{NoLift.sim}]\label{lem:sim}
+If $t \hred K$ in $n$ steps, $n < b$, and $\mathrm{Rel}_b\,t\,t'$, then $t'\hred K$.
+\end{lemma}
+The simulation is \emph{stuttering}: it matches runs, not single steps, as in the
+simulation diagrams of compiler verification \citep{Leroy2009}.  At a
+combinator head both sides contract the same redex.  At an infinite-numeral head,
+$t$ unfolds $\omega$ and $t'$ unfolds $\num{m}$, by head reductions whose lengths may
+differ, and the bound $b$ drops by one.  The bound counts how many more unfoldings of
+$\omega$ the numerals $\num{m}$, $m\ge b$, can match.
+\begin{proof}
+Induction on $n$.  A related pair has a common shape: the same combinator at the head
+of both spines with pointwise related arguments, or $\omega$ against $\num{m}$ with
+related arguments (\lean{Rel.spine}).
+\emph{Combinator heads.}  If the head is $S$, $K$ or $I$ with enough arguments, both
+sides contract the same redex and the results are related at the same $b$ (a
+congruence tolerates duplication by $S$ and erasure by $K$).  With too few arguments
+$t$ is a weak head normal form, so $n=0$ and $t=K$, whence $t'=K$.
+\emph{Infinite-numeral heads.}  With two or more arguments, $t$ takes at least one step
+to $s\,(K\,\omega'\,s)\,\vec r$ and, since $m\ge b>n\ge 1$, $\num{m} = \num{k+1}$
+reduces to $s'\,(K\,\num{k}\,s')\,\vec r\,'$.  The results are related at $b-1$, and
+the remaining run from $t$'s reduct is shorter than $b-1$ steps.  With fewer
+arguments $t$'s run would stop at a weak head normal form other than $K$, which
+determinism of head reduction rules out.
+\end{proof}
+
+\begin{proof}[Proof of Theorem~\ref{thm:nolift}]
+Suppose $L$ lifts.  The function $f = G\,\omega$ is total (constantly $\F$); let
+$\code{c}$ be its code.  Then $\fn{EqT}_c\,(L\,f)\red\T$, so
+$\fn{EqT}_c\,(L\,f)$ head-reduces to $K$ in some $n$ steps.  The term
+$\fn{EqT}_c\,(L\,(G\,\num{n+1}))$ is related to it at $n+1$, so it too reduces to
+$\T$ (Lemma~\ref{lem:sim}): $L$ gives the total function $G\,\num{n+1}$ the same
+code $c$.  But $G\,\omega\,\num{n+2}\red\F$ while
+$G\,\num{n+1}\,\num{n+2}\red\T$, so $c\,\num{n+2}$ reaches both booleans, contradicting
+Church--Rosser.
+\end{proof}
+The argument is the classical one that the almost-everywhere-zero functions are not
+finitely identifiable \citep{Balbach2020}: an answer committed to after finitely many
+observations of the zero function is shared by a function that differs later.  The
+simulation supplies ``finitely many observations'' for a live argument.
+
+\subsection{Sharpness}\label{sec:sharp}
+The proof of Theorem~\ref{thm:nolift} uses only $G\,\omega$ and the $G\,\num{k}$
+(\lean{no\_lift\_core}), and each $G\,\num{k}$ has a modulus: it is $(k{+}1)$-local
+(\lean{G\_num\_nlocal}).  So Theorems~\ref{thm:nolift} and~\ref{thm:nat} combine:
+\begin{theorem}[\lean{G\_omega\_not\_local}, \lean{no\_lift\_local\_plus\_one}]\label{thm:sharp}
+$G\,\omega$ is $m$-local for no $m$, and no closed term lifts every $m$-local function
+(for every $m$) together with $G\,\omega$.
+\end{theorem}
+\begin{proof}
+If $G\,\omega$ were $m$-local, $L_\Nat$ would lift it and every $G\,\num{k}$,
+contradicting \lean{no\_lift\_core}; the second claim is the same argument for any $L$.
+\end{proof}
+So among the functions total on the numerals, the line between lift and no lift is
+totality at $\infty$: adding $G\,\omega$, one function without a value there, defeats
+every lift.
+
+\subsection{At \texorpdfstring{$\mathbb{N}_\infty$}{N-infinity}}\label{sec:natinf}
+Totality on the points of $\mathbb{N}_\infty$ gives a modulus outright.  The points of $\mathbb{N}_\infty$ are definable: the
+numerals and an infinite numeral $\omega$.  Lemma~\ref{lem:sim} generalizes in two ways
+(\lean{NatFan.simW}): an infinite numeral may be related to \emph{any} term with enough
+successor layers, the right side reducing weakly; and the run may end at any weak head
+normal form $v$, returning a related $v'$.  The second form serves the false case: a
+run of $f\,\omega$ to $\F$ ends at some $K\,x$ with $x\red I$, and the simulation then
+follows $x$'s run in turn.
+\begin{theorem}[\lean{NatFan.nat\_fan}, \lean{local\_iff\_total\_inf}, \lean{nat\_lift\_inf}]\label{thm:natfan}
+A function total on the numerals and at $\omega$ is $m$-local for some $m$.  Hence, for $f$
+total on the numerals, $f$ has a modulus iff $f\,\omega$ reaches a boolean, and $L_\Nat$
+lifts every $f$ total on the points of $\mathbb{N}_\infty$.
+\end{theorem}
+\begin{proof}
+If $f\,\omega$ head-reduces to a boolean in $n$ steps (plus $n'$ for the inner $I$ in the
+false case), the simulation fixes $f$'s value on every term with at least $n+n'+2$ layers.
+The values on the finitely many numerals below that depth come from totality by finite choice, which needs no axiom of choice.
+\end{proof}
+With Theorem~\ref{thm:sharp}, the $\Nat$ row is settled as a statement about classes:
+$L_\Nat$ lifts every function total on the numerals and at $\infty$, and no closed term
+lifts that class together with $G\,\omega$, which is total on the numerals and has no value
+at $\infty$.
+
+\subsection{At Cantor space}\label{sec:fancantor}
+At Cantor space the answer depends on which points count: totality on the definable
+streams gives no lift, and totality on all points gives one in an oracle semantics.
+
+\paragraph{Under totality on the definable streams.}  The impossibility of
+\S\ref{sec:nolift} holds for any family $\Psi\,\omega$, $\Psi\,\num{k}$ that some test input
+separates for every $k$ (\lean{CantorTotal.no\_lift\_family}).  Take a binary tree $T$ of
+finite words, decided on stream prefixes by a closed term, and let $\Psi\,c\,s$ ask whether
+$s$ leaves $T$ within $c$ steps.  $\Psi\,\num{k}$ gives up after $k$ steps;
+$\Psi\,\omega$ never gives up.  If $T$ has no definable infinite path, $\Psi\,\omega$ is
+total and true on every definable stream.  If $T$ is infinite and prefix-closed, a stream
+that follows a long word of $T$ and then continues with zeros separates $\Psi\,\omega$
+from $\Psi\,\num{k}$.
+\begin{theorem}[\lean{KleeneTree.no\_lift\_cantor\_total'}]\label{thm:ctotal}
+No closed term lifts every functional total on the definable streams.
+\end{theorem}
+The proof needs a Kleene tree decided by a closed term, and we build one inside the calculus
+(\lean{KleeneTree.kleene}).  A small universal machine on codes performs one head step
+(\lean{Univ.stepC\_spec}, mirroring the computable contraction) and a bounded run
+(\lean{evalC\_spec}); a diagonal walk numbers every term (\lean{dec\_surj}, \lean{decC\_num}).
+The tree holds a word $w$ iff, for every $e<|w|$, the term numbered $e$, applied to $\num{e}$
+and read as a boolean, does not reach $w(e)$ within $|w|$ steps.  It is prefix-closed (a
+verdict found with less fuel stands with more), infinite (choose each bit against its
+verdict), and has no definable path: a definable stream $s$ gives the term
+$\fn{Nth}\,s$, whose number $e$ has a run converging to $s$'s bit at $e$.
+
+\paragraph{At Cantor space, with oracles.}  The step from pointwise totality to a modulus, the
+\emph{fan step}, needs non-definable points.  Extend
+the calculus with a constant $\fn{Ora}_\alpha$ for every $\alpha : \mathbb{N}\to\Bool$,
+reducing as a stream cell: $\fn{Ora}_\alpha\,k \to k\,\alpha(0)\,\fn{Ora}_{\alpha(\cdot+1)}$.
+We call the extended calculus the \emph{oracle semantics}: every point of Cantor
+space, definable or not, is now a term.
+A closed functional is \emph{oracle-total} when $F\,\fn{Ora}_\alpha$ head-reduces to
+exactly $\T$ or $\F$ for every $\alpha$.  For $\F$ this asks more than the proof
+needs; the relaxed form (\lean{OracleFan.cantor\_fan\_w}) uses the two-stage argument of
+the $\mathbb{N}_\infty$ case.  A term may apply a stream to arbitrary continuations, not
+only to the head and tail selectors, but the simulation absorbs this, because the oracle
+answers any continuation as a cons cell would.  So a run of $F\,\fn{Ora}_\alpha$ is
+mirrored on every term of the pure calculus that shares enough of $\alpha$'s bits,
+whatever its tail (\lean{OracleFan.simO}).  Hence $F$ has a \emph{pointwise modulus}
+at every $\alpha$: a length $n_\alpha$ such that $F$ returns its value at $\alpha$ on
+every term that shares the first $n_\alpha$ bits of $\alpha$ (\lean{oracle\_local}).
+\begin{theorem}[\lean{OracleFan.cantor\_fan}, \lean{cantor\_lift\_oracle}]\label{thm:ofan}
+An oracle-total functional is $m$-local for some $m$, and $L_C$ lifts it.
+\end{theorem}
+\begin{proof}
+The fan theorem (\lean{OracleFan.fan}, proved by K\"onig's lemma) turns the pointwise
+moduli into one bound.  The fan theorem is classical: these results use
+\texttt{Classical.choice}, and the simulation does not.
+\end{proof}
+\paragraph{Where the step is classical.}  Call $F$ \emph{barred} at a word $w$ when it is
+constant on every term with prefix $w$, or when it is barred at both one-bit extensions
+of $w$.  This is an inductive bar, the statement that $F$'s query tree is well-founded.
+Constructively, being barred at the empty word is equivalent to having a modulus
+(\lean{OracleBar.obar\_iff\_local}).  The fan step then factors into three parts
+(\lean{cantor\_fan\_bar}):
+\begin{itemize}
+\item from runs to pointwise moduli, by the simulation (constructive);
+\item from pointwise moduli to a bar, by the fan theorem for this bar
+    (\lean{pointwise\_obar}; classical, the only such step);
+\item from the bar to a table (constructive).
+\end{itemize}
+
+Passing to the term model does not remove the middle step; it makes the step fail.
+Theorem~\ref{thm:ctotal} records the failure: over the definable streams, pointwise
+totality gives no bar, because the Kleene tree above is infinite and has no definable
+path.
+
+\subsection{Scope}\label{sec:boundary}
+Sections~\ref{sec:modulus} and~\ref{sec:fan} settle Table~\ref{tab:results} under one
+standard hypothesis, the classical fan theorem in the oracle semantics.  An open question
+in the $\Nat$ row remains: whether adding \emph{any} function without a value at
+$\infty$ to the functions with a modulus defeats every lift.
+
+%% ---------------------------------------------------------------------------
+\section{Consequences for staged languages}\label{sec:skijack}
+A staged language's data rule should refuse provable functions and admit lifted codes,
+which are data.  A \emph{provable function} is a term that the checker can show, from its syntax and
+the declared types, to be a function: a lambda, a macro, a core, a namespace literal,
+or a combinator, constructor or equation applied to fewer arguments than it takes.
+The guarantee is one-directional: it does not assert that every accepted occupant of a
+data position is a datum \citep{skijack}.
+SKIjack enforces the rule in two stages \citep{skijack}, the first of which is fixed
+here.  Stage A (which formerly decided ``function'' by the presence of binders) decides
+by arity, and refuses an under-applied combinator or equation, or a saturated equation
+whose body is one.  Stage B, a Hindley--Milner discipline over the declared sum types,
+refuses a function that reaches a data position through a bound variable.  With both
+stages, no accepted program has a provable function in a data position.
+
+Because lifted codes are data, $\mathtt{EQ}$ on two of them legitimately decides
+extensional equality of two live functions at the liftable types.  The staging line is
+not a confidentiality boundary: a term that holds a function can already probe it, and
+a canonical code reveals only its extension.
+The same line also appears one level up, in an interpreter hosted on a combinator calculus.
+SKIlark \citep{skilark} implements Joy as SKIjack programs: its words are closed
+supercombinators, and its quotations are Scott lists of words, so a Joy program is
+data by construction and a word taken from a quotation is a symbol, not a live
+function.  The no-quote theorem binds the host, not the object language: an
+interpreter quotes its own programs because it represents them.  The staging line
+reappears only where a live host value must become an object-level datum, which
+is a lift in the sense of \S\ref{sec:lift}.
+
+The arguments of \S\S\ref{sec:modulus}--\ref{sec:fan} use confluent weak reduction,
+deterministic head reduction, and Scott encodings of booleans, numerals, streams and
+codes.  Their case analyses are over $S$, $K$ and $I$, but analogous ones should go
+through for any combinatory basis with these properties, each with its own
+mechanization.  Calculi with an intensional operator differ: SF-calculus and tree
+calculus \citep{JayGivenWilson2011,Jay2021} factorize normal forms, so the premise of
+the no-quote argument changes there, and where the staging line may fall in them we
+leave open.
+
+%% ---------------------------------------------------------------------------
+\section{Mechanization}\label{sec:mech}
+All results are in \texttt{lean-ski} \citep{leanski}, on Lean~4.31.  The axiom gate \texttt{\#audit\_clean} admits only
+\texttt{propext} and \texttt{Quot.sound}.  Every module's theorems are in the gate except
+the fan theorem and the results that use it (\lean{OracleFan.fan}, \lean{cantor\_fan},
+\lean{OracleBar.pointwise\_obar}), which add \texttt{Classical.choice}.  The table below
+situates our results by module:
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+module & results \\
+\midrule
+\lean{Requote}, \lean{Ifix} & re-encoding; intensional fixed points; a quine \\
+\lean{LiftBool} & Theorem~\ref{thm:bool} \\
+\lean{NatLift} & Lemma~\ref{lem:searchN}, Theorems~\ref{thm:nat} and~\ref{thm:sharp} \\
+\lean{Search} & Lemma~\ref{lem:search}; $\fn{Nth}$, $\fn{Tab}$ \\
+\lean{CantorLift} & Theorem~\ref{thm:cantor} \\
+\lean{Coalgebra} & the second coalgebra law \\
+\lean{NoLift} & Theorem~\ref{thm:nolift}: simulation, $G$, $\fn{EqT}$, \lean{no\_lift\_core} \\
+\lean{NatFan} & Theorem~\ref{thm:natfan} \\
+\lean{CantorTotal}, \lean{Univ}, \lean{KleeneTree} & Theorem~\ref{thm:ctotal} \\
+\lean{OracleFan} & Theorem~\ref{thm:ofan} (\texttt{Classical.choice}) \\
+\lean{OracleBar} & the classical step isolated \\
+\bottomrule
+\end{tabular}
+\end{center}
+We build recursive terms with \texttt{lean-ski}'s $\fn{FixSelf}$ and bracket
+abstraction over open terms (\lean{absN}); all reasoning is by existential weak reduction, with head
+reduction only inside the simulation.
+
+%% ---------------------------------------------------------------------------
+\section{Related work}\label{sec:related}
+\paragraph{Modality and intensionality.}  S4 for staging is due to Davies--Pfenning
+\citep{DaviesPfenning2001}.  Kavvos \citep{Kavvos2017,Kavvos2020} gave the intensional
+comonad, Barendregt's no-quote argument, and intensional recursion with the
+G\"odel--L\"ob axiom \citep{Kavvos2021}.  His Q-coalgebras \citep[Def.~33]{Kavvos2017}
+are the abstract form of a behavioral lift; he did not characterize which types carry
+one.  Another factorization impossibility for $SK$ is due to \citet{JayGivenWilson2011};
+Jay's tree calculus quotes programs but not computations \citep{Jay2021}.
+\paragraph{Reification.}  Normalization by evaluation
+\citep{BergerSchwichtenberg1991} and type-directed partial evaluation
+\citep{Danvy1996} reify at higher types by type-directed $\eta$-expansion over a
+model with syntax at base type; sums need control or a sheaf model
+\citep{Danvy1996,ADHS2001}, and inductive types are out of reach.
+\citet{AltenkirchUustalu2004} quote at every finite type of $\lambda^{\to 2}$ by
+enumerating finite domains as decision trees, in the metalanguage.  Our lifts are terms
+of the calculus applied to live arguments.
+\paragraph{Exhaustibility.}  Berger introduced the search over Cantor space
+\citep{Berger1990}.  The fan functional computed from a functional alone, decidable
+equality at compact domains, and the searchability of $\mathbb{N}_\infty$ are due to
+Escard\'o \citep{Escardo2007,Escardo2008,EscardoBlog2007}; our reading of the staging line borrows
+the shape of his compact and discrete types \citep[Thm.~4.13]{Escardo2008}.  Decision trees for
+continuous functionals are also built from a term's syntax, by translation (dialogue
+trees; see \citet{BaillonMahboubiPedrot2026}); ours come from the live value, by search.
+\paragraph{Continuity.}  It is standard that a computation queries a type-1 argument finitely often,
+and so cannot extract an index from an oracle \citep[\S2.3--2.4]{Longley2005};
+see \citet{LongleyNormann2015}.  Our specific argument is finite identification
+\citep{Balbach2020}.  We know of no continuity theorem for weak combinatory logic;
+combinatory B\"ohm trees \citep{DybjerKuperberg2012} would be its natural home, and in
+$\lambda$ the continuity and genericity lemmas \citep[\S14.3]{Barendregt1984} would give
+our step.  The stuttering simulation is a self-contained substitute.
+
+
+\bibliographystyle{plainnat}
+\bibliography{mss}
+\end{document}
