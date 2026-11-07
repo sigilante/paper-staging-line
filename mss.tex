@@ -1,17 +1,59 @@
-% Logical Methods in Computer Science.  With lmcs.cls on the TeX path this builds
-% in the LMCS class; otherwise it falls back to article so the draft still builds.
-\IfFileExists{lmcs.cls}{%
-  \documentclass{lmcs}\def\lmcsclass{}}{%
-  \documentclass[11pt]{article}\usepackage[margin=1.1in]{geometry}}
+% The venue: acm (ACM TOCL, acmart), msc (MSCS, Cambridge's msc.cls), lmcs (LMCS),
+% or article.  Set it here, or with  latexmk -usepretex='\def\venue{msc}' .
+\ifdefined\venue\else\def\venue{acm}\fi
+\def\venueacm{acm}\def\venuemsc{msc}\def\venuelmcs{lmcs}
+\ifx\venue\venueacm
+  \documentclass[acmsmall,review,screen]{acmart}\def\acmclass{}
+\else\ifx\venue\venuemsc
+  \documentclass{msc}\def\mscclass{}
+\else\ifx\venue\venuelmcs
+  \documentclass{lmcs}\def\lmcsclass{}
+\else
+  \documentclass[11pt]{article}\usepackage[margin=1.1in]{geometry}
+\fi\fi\fi
+\ifdefined\acmclass
+  \acmJournal{TOCL}
+  \setcopyright{none}
+  \settopmatter{printacmref=false}
+  \citestyle{acmauthoryear}
+\fi
+\ifdefined\mscclass
+  % msc.cls defines these two, which amssymb defines again
+  \let\gtrsim\relax\let\lesssim\relax
+\fi
+\ifdefined\acmclass\else
 \usepackage{amsmath,amssymb,amsthm}
-\usepackage[numbers]{natbib}
 \usepackage{booktabs}
-\usepackage{microtype}
-\ifdefined\lmcsclass\else
+\fi
+\ifdefined\acmclass
+  % acmart loads natbib, hyperref, booktabs and the AMS packages itself
+\else\ifdefined\mscclass
+  % msc.cls loads natbib (author-year) and hyperref itself.  MSCS asks for double
+  % spacing at submission.
+  \usepackage{setspace}\doublespacing
+  \usepackage{graphicx}  % the running head sets cup_logo (converted to PDF)
+\else
+  \usepackage[authoryear,round]{natbib}
+  \usepackage{microtype}
+\fi\fi
+\ifdefined\acmclass\else
+% Harvard citations, as MSCS asks: (Smith 1983; Jones and Jones 1985)
+\setcitestyle{authoryear,round,semicolon,aysep={},yysep={,}}
+\fi
+% numbered lists as (1), (2), (3)
+\renewcommand{\labelenumi}{(\arabic{enumi})}
+\ifdefined\lmcsclass\else\ifdefined\mscclass\else\ifdefined\acmclass\else
   \usepackage{hyperref}
   \providecommand{\keywords}[1]{\par\noindent\textbf{Keywords.} #1\par}
-\fi
-\ifdefined\lmcsclass
+\fi\fi\fi
+\ifdefined\acmclass
+  % acmart predefines theorem, lemma, proposition, corollary and definition
+\else\ifdefined\mscclass
+  % msc.cls predefines lemma, proposition, corollary, definition and remark on one
+  % numbered counter, and theorem unnumbered; ours is its numbered `therm'.
+  \let\theorem\relax\let\endtheorem\relax
+  \newenvironment{theorem}{\therm}{\endtherm}
+\else\ifdefined\lmcsclass
   % LMCS predefines its theorem environments; ours are aliases, sharing its numbering.
   \newenvironment{theorem}{\thm}{\endthm}
   \newenvironment{lemma}{\lem}{\endlem}
@@ -29,11 +71,11 @@
   \newtheorem{definition}[theorem]{Definition}
   \theoremstyle{remark}
   \newtheorem{remark}[theorem]{Remark}
-\fi
+\fi\fi\fi
 \newcommand{\code}[1]{\langle #1\rangle}
 \newcommand{\red}{\twoheadrightarrow}
 \newcommand{\hred}{\twoheadrightarrow_{h}}
-\newcommand{\lean}[1]{\texttt{#1}}
+\newcommand{\lean}[1]{{\ttfamily\def\_{\textunderscore\allowbreak}#1}}  % Lean names; may break after _
 \newcommand{\fn}[1]{\textup{#1}}  % named terms: upright everywhere, even in theorem statements
 \newcommand{\T}{\mathsf{T}}
 \newcommand{\F}{\mathsf{F}}
@@ -46,28 +88,69 @@ In weak combinatory logic over $\{S,K,I\}$ no term quotes every term, so a stage
 language built on it fixes quotation at compile time.  We read that discipline as the
 S4 necessity modality of Davies--Pfenning and Kavvos, and ask where a
 \emph{behavioral lift} exists: a closed term that sends a live value to a code
-agreeing with it, an instance of Kavvos' Q-coalgebras and a weak substitute for the
+agreeing with it, a weak analogue of Kavvos' Q-coalgebras and a weak substitute for the
 missing unit.  The answer depends on where the value must be total.  A lift exists at
 $\Bool\to\Bool$ under totality on the booleans; provably none exists at $\Nat\to\Bool$
 under totality on the numerals.  Under a modulus, an operational
 form of totality on a compact point set, a lift exists at $\Nat\to\Bool$ by search
-over $\mathbb{N}_\infty$ and at $(\Nat\to\Bool)\to\Bool$ by Berger's search over
-Cantor space.  Totality at the point at infinity suffices for $\Nat\to\Bool$, and
+over $\mathbb{N}_\infty$ and at Cantor space, for functionals of streams, by Berger's
+search, which also gives one at $(\Nat\to\Bool)\to\Bool$.  Totality at the point at infinity suffices for $\Nat\to\Bool$, and
 totality on every point of Cantor space suffices in an oracle semantics; totality on
 the definable streams does not, by a Kleene tree built inside the calculus.  The staging
 line for behavioral lift is therefore drawn at compactness of the point set on which
 totality is demanded, namely Escard\'o's boundary for decidable equality.  We construct
 the modal reading and produce constructions in weak combinatory logic and a
-compactness observation.  All results are mechanized in Lean~4.}
+compactness observation.  All theorems are mechanized in Lean~4.}
 
 \begin{document}
 
-\ifdefined\lmcsclass
+\ifdefined\acmclass
+  \title[The Staging Line Is Compactness]{The Staging Line Is Compactness:
+    Behavioral Reification in Weak Combinatory Logic}
+  \author{N. E. Davis}
+  \orcid{0000-0002-1131-8319}
+  \email{NDavis@ZeroAttest.com}
+  \affiliation{%
+    \institution{ZeroAttest}
+    \city{Champaign}
+    \state{Illinois}
+    \country{USA}}
+  \begin{abstract}\theabstract\end{abstract}
+  % CCS concepts (ACM CCS 2012); the CCSXML block, a verbatim environment, cannot sit
+  % inside this conditional, and ACM's submission form collects the concepts anyway
+  \ccsdesc[500]{Theory of computation~Lambda calculus}
+  \ccsdesc[300]{Theory of computation~Modal and temporal logics}
+  \ccsdesc[300]{Theory of computation~Equational logic and rewriting}
+  \ccsdesc[100]{Theory of computation~Constructive mathematics}
+  \keywords{combinatory logic, staging, modal type theory, reification, exhaustible sets,
+  fan theorem, Kleene tree, Lean}
+  \maketitle
+\else\ifdefined\mscclass
+  \lefttitle{N.\ E.\ Davis}
+  \righttitle{The Staging Line Is Compactness}
+  % journal metadata, as in Cambridge's MSCguide.tex; the publisher fills these in
+  \papertitle{Article}
+  \jnlPage{1}{00}
+  \jnlDoiYr{2027}
+  \doival{10.1017/xxxxx}
+  \title{The Staging Line Is Compactness: Behavioral Reification in Weak Combinatory
+    Logic}
+  \begin{authgrp}
+  \author{N.\ E.\ Davis}
+  \affiliation{ZeroAttest, Champaign, Illinois, USA\\
+  \email{NDavis@ZeroAttest.com}}
+  \end{authgrp}
+  \history{(Received xx xxx xxx; revised xx xxx xxx; accepted xx xxx xxx)}
+  \begin{abstract}\theabstract\end{abstract}
+  \begin{keywords}combinatory logic; staging; modal type theory; reification;
+  exhaustible sets; fan theorem; Kleene tree; Lean\end{keywords}
+  \maketitle
+\else\ifdefined\lmcsclass
   \title[The staging line is compactness]{The Staging Line Is
-    Compactness: Behavioral Reification in Weak Combinatory Logic}
-  \titlecomment{All results are mechanized in Lean~4 (\texttt{lean-ski}).}
+    Compactness:\\Behavioral Reification in Weak Combinatory Logic}
+  \titlecomment{All theorems are mechanized in Lean~4 (\texttt{lean-ski}).}
   \author[N.~E.~Davis]{N.~E.~Davis}[a]
-  \address{ZeroAttest, Champaign, Illinois}
+  \address{\lsuper{a}ZeroAttest, Champaign, Illinois}
   \keywords{combinatory logic, staging, modal type theory, reification, exhaustible sets,
   fan theorem, Kleene tree, Lean}
   \begin{abstract}\theabstract\end{abstract}
@@ -81,7 +164,7 @@ compactness observation.  All results are mechanized in Lean~4.}
   \begin{abstract}\theabstract\end{abstract}
   \keywords{combinatory logic, staging, modal type theory, reification, exhaustible sets,
   fan theorem, Kleene tree, Lean}
-\fi
+\fi\fi\fi
 
 
 \section{Introduction}\label{sec:intro}
@@ -89,13 +172,14 @@ A language whose instruction set is $\{S,K,I\}$ cannot quote at run time: no clo
 term $Q$ has $Q\,M \red \code{M}$ for every $M$
 \citep{Barendregt1991,DavisMeta} (\lean{no\_quote}).  The declarative $SKI$ ``assembly
 language'' SKIjack \citep{skijack}
-therefore makes quotation a compile-time construct, and checks that four surface
-positions (equality operands, quotation arguments, namespace keys and scry paths)
-hold data, not functions.  Davies and Pfenning \citep{DaviesPfenning2001} read
+therefore makes quotation a compile-time construct, and checks that three surface
+positions (the operands of equality, namespace facts and scry paths) hold data, not
+functions; a quotation's body is checked against the program's symbol tables
+instead.  Davies and Pfenning \citep{DaviesPfenning2001} read
 staging as S4 necessity, and Kavvos \citep{Kavvos2017} develops intensional
 recursion in that frame for untyped $\lambda$, where evaluation and code-for-code
 are definable and only quoting is not.  Section~\ref{sec:modality} places SKIjack's
-discipline in the same frame, with the comonad's structure maps mechanized over
+discipline in the same frame, with its counit and comultiplication mechanized over
 $\{S,K,I\}$.
 
 While the syntactic unit is impossible, a weaker one need not be.  A \emph{behavioral}
@@ -111,24 +195,24 @@ combinatory logic and with mechanized proofs, that the behavioral question has a
 different answer, one that turns on where the value must be total
 (Table~\ref{tab:results}).
 \begin{table}[tb]\centering\footnotesize
-\caption{behavioral lifts, by type and by where totality is demanded.}\label{tab:results}
+\caption{Behavioral lifts, by type and by where totality is demanded.}\label{tab:results}
 \begin{tabular}{@{}lll@{}}
 \toprule
  & totality on a non-compact point set & totality on a compact point set \\
 \midrule
 $\Bool\to\Bool$ & --- & lift (Thm.~\ref{thm:bool}) \\
 $\Nat\to\Bool$ & $\mathbb{N}$: no lift (Thm.~\ref{thm:nolift}) & $\mathbb{N}_\infty$: lift (Thms.~\ref{thm:nat}, \ref{thm:natfan}) \\
-$(\Nat\to\Bool)\to\Bool$ & definable streams: no lift (Thm.~\ref{thm:ctotal}) & all points: lift$^\ddagger$ (Thms.~\ref{thm:cantor}, \ref{thm:ofan}) \\
+Cantor space$^\S$ & definable streams: no lift (Thm.~\ref{thm:ctotal}) & all points: lift$^\ddagger$ (Thms.~\ref{thm:cantor}, \ref{thm:ofan}) \\
 \bottomrule
 \end{tabular}\\[2pt]
-{\footnotesize $^\ddagger$in an oracle semantics, by the classical fan theorem.}
+{\footnotesize $^\S$functionals of streams.  At $(\Nat\to\Bool)\to\Bool$ only the lift under a modulus is mechanized (Thm.~\ref{thm:cantor}).\\ $^\ddagger$in an oracle semantics, by the classical fan theorem.}
 \end{table}
 A function has a \emph{modulus} when it reads its argument only to a bounded
 depth: boundedly many successor layers of a numeral, or boundedly many bits of a
 stream.  A modulus is an operational form of totality on a compact point set:
 it asks for a value on every term that agrees with a point up to a finite depth.
 For $\Nat\to\Bool$ the points correspond to $\mathbb{N}_\infty$, the naturals with a
-point at infinity; for $(\Nat\to\Bool)\to\Bool$ they are the points of Cantor space,
+point at infinity; for functionals of streams they are the points of Cantor space,
 the infinite boolean sequences $\alpha:\mathbb{N}\to\Bool$, of which terms define only
 countably many.
 Totality on the numerals does not demand a value at $\infty$, and under that
@@ -162,7 +246,7 @@ extraction.  % We offer the reading as an observation, not a classification; wha
 \item Consequences for a staged language's data rule, including a fix to SKIjack's
   checker (\S\ref{sec:skijack}).
 \end{enumerate}
-Every result is mechanized in Lean~4 against \texttt{lean-ski} \citep{leanski}
+Every theorem is mechanized in Lean~4 against \texttt{lean-ski} \citep{leanski}
 (\S\ref{sec:mech}).  The
 ingredients are known: finite tabulation \citep{AltenkirchUustalu2004}, Berger's
 search \citep{Berger1990} and Escard\'o's account of it
@@ -211,6 +295,8 @@ $\omega\,a\,s \hred s\,(K\,\omega'\,s)$ for another infinite numeral $\omega'$, 
 one explicit step followed by a head reduction (\lean{omega\_steps}), exactly as
 $\num{m+1}\,a\,s\hred s\,(K\,\num{m}\,s)$; with fewer arguments $\omega$ reaches a
 weak head normal form other than $K$ (\lean{omega\_whnf0}, \lean{omega\_whnf1}).
+We write $\omega_0$ for $\fn{FixSelf}\,\fn{Succ}\,(\fn{FixB}\,\fn{Succ})$; the results
+below about a value at an infinite numeral are stated, and mechanized, at $\omega_0$.
 
 \paragraph{Prefixes and layers.}  A term $s$ \emph{has the prefix}
 $w = b_0\cdots b_{k-1}$ when $s \red \fn{Cons}\,b_0\,s_1$,
@@ -238,7 +324,7 @@ third is not (Table~\ref{tab:s4}).
 \toprule
 axiom & map & over $\{S,K,I\}$ \\
 \midrule
-T: $\Box A\to A$ & unquote, $\varepsilon$ & $\varepsilon\,\code{t}\red t$, definable \\
+T: $\Box A\to A$ & unquote, $\varepsilon$ & $\varepsilon\,\code{t}\red t$, definable (\lean{Unquote.unquote}) \\
 4: $\Box A\to\Box\Box A$ & re-encode, $\delta$ & $\delta\,\code{t}\red\code{\code{t}}$, definable (Prop.~\ref{prop:requote}) \\
 converse of T: $A\to\Box A$ & quote, $\eta$ & no closed $Q$ has $Q\,M\red\code{M}$ \citep{Barendregt1991} \\
 \bottomrule
@@ -246,10 +332,13 @@ converse of T: $A\to\Box A$ & quote, $\eta$ & no closed $Q$ has $Q\,M\red\code{M
 \end{table}
 
 An unquoter
-$\varepsilon : \Box A \to A$ with $\varepsilon\,\code{t} \red t$ is definable
-(e.g., SKIjack encodes one in 43
-atoms \citep{DavisMeta}).  Re-encoding is definable as well since
-it acts on data: \newpage
+$\varepsilon : \Box A \to A$ with $\varepsilon\,\code{t} \red t$ is definable, as the
+fixed point of
+\[
+\lambda e\,q.\ q\,S\,K\,I\,(\lambda f\,a.\ e\,f\,(e\,a))
+\]
+(\lean{Unquote.unquote}); SKIjack's encodes one in 43 atoms \citep{DavisMeta}.  Re-encoding is definable as well since
+it acts on data:
 \begin{proposition}[\lean{Requote.requote}]\label{prop:requote}
 There is a closed $R$ with $R\,\code{t} \red \code{\code{t}}$ for every $t$.
 \end{proposition}
@@ -263,13 +352,19 @@ where
 $\fn{App}'\,u\,v = \fn{App}\,(\fn{App}\,\code{\fn{App}}\,u)\,v$ is the
 code of an application given the codes of its parts.  Induction on $t$.
 \end{proof}
-So $\varepsilon$ and $\delta = R$ give $\Box$ the structure of a comonad, and the
+With $\varepsilon$ and $\delta = R$, the counit laws hold as far as codes allow:
+$\varepsilon\circ\delta = \mathrm{id}$ outright (\lean{Unquote.counit\_delta}), and
+$\Box\varepsilon\circ\delta = \mathrm{id}$ only up to conversion under the box, since
+$\Box\varepsilon\,(\delta\,\code{t})$ reduces to the code of $\varepsilon\,\code{t}$, a term
+that reduces to $t$ (\lean{Unquote.box\_counit\_delta}).  The same gap recurs in the
+second coalgebra law (\S\ref{sec:coalg}).  The
 unit $\eta : A \to \Box A$, a closed $Q$ with $Q\,M\red\code{M}$, is exactly what no
 term provides \citep{Barendregt1991} (\lean{no\_quote}).  Kavvos
 \citep[\S1.3--1.4]{Kavvos2017} describes the same situation for untyped $\lambda$.
 Self-reference survives the missing unit:
 \begin{theorem}[Intensional fixed points; \lean{Ifix.ifix}, \lean{Ifix.quine}]
-For every $g$ there is $t$ with $t \red g\,\code{t}$.  With $g = I$, $t\red\code{t}$.
+For every $g$ there is $t$ with $t \red g\,\code{t}$.  In particular there is a quine, a
+term $t$ with $t\red\code{t}$.
 \end{theorem}
 \begin{proof}
 Let $h = \lambda y.\ g\,(\fn{App}\,y\,(R\,y))$ and $t = h\,\code{h}$.  Then
@@ -307,8 +402,10 @@ streams under totality.
 A \emph{Q-coalgebra} in Kavvos' sense \citep[Def.~33]{Kavvos2017} is a map
 $\alpha : A\to\Box A$ with $\varepsilon\circ\alpha\sim\mathrm{id}$ and
 $\delta\circ\alpha\sim\Box\alpha\circ\alpha$.  The first law, with $\sim$ read as
-agreement on the test inputs, is satisfied by the lifts of \S\ref{sec:modulus}.
-The second law is discussed in \S\ref{sec:coalg}.
+agreement on the test inputs, is satisfied by the lifts of \S\ref{sec:modulus}; the
+second holds only up to conversion of the quoted terms, and fails at his $\sim$
+(\S\ref{sec:coalg}).  Our lifts are therefore not Q-coalgebras in his sense but a weak
+analogue of them.
 
 %% ---------------------------------------------------------------------------
 \section{Lifts from a modulus}\label{sec:modulus}
@@ -372,16 +469,21 @@ by the search.
 $\fn{Every}\,p = \fn{Not}\,(p'\,(\fn{Srch}\,p'))$ with
 $p' = \fn{Not}\circ p$, decides whether $\varphi$ holds at every $k\le m$
 (\lean{everyN\_spec}).  The second,
-$\fn{Const}\,f = \fn{Every}\,(\lambda n.\ \fn{EqB}\,(f\,n)\,(f\,\omega))$,
+\[
+\fn{Const}\,f = \fn{Every}\,(\lambda n.\ \fn{EqB}\,(f\,n)\,(f\,\omega_0)),
+\]
 decides whether $f$ is constant (\lean{constN\_spec}).  Then
 \[
-\fn{Tree}\,f = \fn{Const}\,f\ (\fn{Leaf}\,(f\,\omega))\ 
+\fn{Tree}\,f = \fn{Const}\,f\ (\fn{Leaf}\,(f\,\omega_0))\ 
 (\fn{Node}\,(f\,\num 0)\,(\fn{Tree}\,(f\circ\fn{Succ})))
 \]
 reduces to a datum $D_m(\varphi)$ defined by recursion on $m$: a leaf of $\varphi(m)$ if
 $\varphi$ is constant on $0..m$, else a node of $\varphi(0)$ and $D_{m-1}(\varphi(\cdot+1))$
 (\lean{treeN\_spec}).  It depends only on $\varphi$ (\lean{DN\_congr}).
-$\fn{Eval}\,d\,n = d\,(\lambda b.\,b)\,(\lambda b\,t.\ n\,b\,(\lambda n'.\ \fn{Eval}\,t\,n'))$
+The evaluator
+\[
+\fn{Eval}\,d\,n = d\,(\lambda b.\,b)\,(\lambda b\,t.\ n\,b\,(\lambda n'.\ \fn{Eval}\,t\,n'))
+\]
 runs the datum: $\fn{Eval}\,D_m(\varphi)\,\num c\red\varphi(c)$ for $c<m$ and
 $\fn{Eval}\,D_m(\varphi)\,n\red\varphi(m)$ for $n$ with at least $m$ layers
 (\lean{evalN\_spec}).  The structural lift $\fn{LiftTree}$ at the tree's data type
@@ -395,7 +497,7 @@ L_{\Nat} = \lambda f.\ \fn{App}\,\code{\fn{Eval}}\,(\fn{LiftTree}\,(\fn{Tree}\,f
 \]
 lifts every $m$-local $f$, for every $m$, on the numerals:
 $L_{\Nat}\,f \red \code{\fn{Eval}\,D_m(\varphi)}$, and that term agrees with $f$ on
-every numeral.  Functions with the same values get the same code.
+every numeral.  Two $m$-local functions with the same values get the same code.
 \end{theorem}
 \begin{proof}
 Compose the lemmas; agreement on $\num c$ with $c\ge m$ uses that $\num c$ has at least
@@ -432,7 +534,8 @@ satisfies $\varphi$ if anything starting with $\T$ does.
 We claim no termination of $\fn{Find}$ but do not require it; the lemma asserts
 only that reductions exist.  With sharing, $\fn{Find}\,p$ calls $p$ at most
 $2^{k+1}-1$ times, and a predicate that reads its bits last-first comes close to
-that bound.
+that bound; this is an informal remark about an implementation with sharing, outside
+the reduction semantics of \S\ref{sec:prelim}, and is not mechanized.
 
 \paragraph{Tabulation and lift.}  As in \S\ref{sec:nat}: $\fn{Every}$ and
 $\fn{Const}$ (against the zero stream $0^\omega = \fn{Tab}\,(K\,\F)$) decide universality
@@ -451,9 +554,11 @@ The term
 L_C = \lambda q.\ \fn{App}\,\code{\fn{Eval}}\,(\fn{LiftTree}\,(\fn{Tree}\,q))
 \]
 lifts every $m$-local stream functional, for every $m$, on the terms with a prefix
-of length $m$.  Functionals with the same table get the same code.  The same holds for functionals of functions
-on numerals that read their argument at $0,\dots,m-1$ only, through
-$\fn{Nth}$ and $\fn{Tab}$ (\lean{flocal\_stream}, \lean{tab\_spec}).
+of length $m$.  Two $m$-local functionals with the same table get the same code.  A
+variant, which applies $L_C$ to $\Phi\circ\fn{Nth}$ and precomposes the resulting code
+with $\fn{Tab}$, lifts every functional $\Phi$ of functions on numerals that reads its
+argument at $0,\dots,m-1$ only, agreeing with it on every $f$ whose values there are
+booleans (\lean{flocal\_stream}, \lean{tab\_spec}).
 \end{theorem}
 While the search and the tabulation are due to Berger and Escard\'o
 \citep{Berger1990,Escardo2008,EscardoBlog2007}, the short step from them to a finite
@@ -463,7 +568,7 @@ canonical code is, as far as we know, novel.
 Our lifts satisfy Kavvos' second law up to
 conversion of the quoted terms, but not with his $\sim$ at $\Box\Box A$.  For a lift
 $\alpha$ with $\alpha\,f\red\code{c}$, $\delta(\alpha\,f)\red\code{\code{c}}$ and
-$(\Box\alpha)(\alpha\,f) = \fn{App}\,\code{\alpha}\,(\alpha\,f)\red\code{\alpha\,c}$.  Each of our lifts is
+$(\Box\alpha)(\alpha\,f) = \fn{App}\,\code{\alpha}\,(\alpha\,f)\red\code{\alpha\,c}$.  Each of $L_\Bool$, $L_\Nat$ and $L_C$ is
 idempotent on its outputs, $\alpha\,c\red\code{c}$: the output term meets the lift's own
 hypothesis with the same table, and canonicality returns the same code
 (\lean{Coalgebra.bool\_idem}, \lean{nat\_idem}, \lean{cantor\_idem}).  By
@@ -473,7 +578,8 @@ idempotence the two sides of the law are codes of convertible terms
 \citep[Def.~26]{Kavvos2017}, and every object of codes is
 \citep[Lemma~18]{Kavvos2017}, so at $\Box\Box A$ his $\sim$ compares codes as codes.
 The law fails there: $\code{\code{c}}$ and $\code{\alpha\,c}$ are codes of distinct
-terms, and the equality test $\fn{EqT}$ of \S\ref{sec:prelim} separates them.  His results on Q-coalgebras, which assume the
+terms, since a code is never an application to the term it encodes, and the equality
+test $\fn{EqT}$ of \S\ref{sec:prelim} separates them (\lean{Coalgebra.coalg2\_strict\_fails}).  His results on Q-coalgebras, which assume the
 law at that $\sim$ \citep[Lemmas~19--20, Thms.~30--31]{Kavvos2017}, therefore do not
 apply to our lifts.
 
@@ -529,12 +635,12 @@ determinism of head reduction rules out.
 \end{proof}
 
 \begin{proof}[Proof of Theorem~\ref{thm:nolift}]
-Suppose $L$ lifts.  The function $f = G\,\omega$ is total (constantly $\F$); let
+Suppose $L$ lifts.  The function $f = G\,\omega_0$ is total (constantly $\F$); let
 $\code{c}$ be its code.  Then $\fn{EqT}_c\,(L\,f)\red\T$, so
 $\fn{EqT}_c\,(L\,f)$ head-reduces to $K$ in some $n$ steps.  The term
 $\fn{EqT}_c\,(L\,(G\,\num{n+1}))$ is related to it at $n+1$, so it too reduces to
 $\T$ (Lemma~\ref{lem:sim}): $L$ gives the total function $G\,\num{n+1}$ the same
-code $c$.  But $G\,\omega\,\num{n+2}\red\F$ while
+code $c$.  But $G\,\omega_0\,\num{n+2}\red\F$ while
 $G\,\num{n+1}\,\num{n+2}\red\T$, so $c\,\num{n+2}$ reaches both booleans, contradicting
 Church--Rosser.
 \end{proof}
@@ -544,19 +650,19 @@ observations of the zero function is shared by a function that differs later.  T
 simulation supplies ``finitely many observations'' for a live argument.
 
 \subsection{Sharpness}\label{sec:sharp}
-The proof of Theorem~\ref{thm:nolift} uses only $G\,\omega$ and the $G\,\num{k}$
+The proof of Theorem~\ref{thm:nolift} uses only $G\,\omega_0$ and the $G\,\num{k}$
 (\lean{no\_lift\_core}), and each $G\,\num{k}$ has a modulus: it is $(k{+}1)$-local
 (\lean{G\_num\_nlocal}).  So Theorems~\ref{thm:nolift} and~\ref{thm:nat} combine:
 \begin{theorem}[\lean{G\_omega\_not\_local}, \lean{no\_lift\_local\_plus\_one}]\label{thm:sharp}
-$G\,\omega$ is $m$-local for no $m$, and no closed term lifts every $m$-local function
-(for every $m$) together with $G\,\omega$.
+$G\,\omega_0$ is $m$-local for no $m$, and no closed term lifts every $m$-local function
+(for every $m$) together with $G\,\omega_0$.
 \end{theorem}
 \begin{proof}
-If $G\,\omega$ were $m$-local, $L_\Nat$ would lift it and every $G\,\num{k}$,
+If $G\,\omega_0$ were $m$-local, $L_\Nat$ would lift it and every $G\,\num{k}$,
 contradicting \lean{no\_lift\_core}; the second claim is the same argument for any $L$.
 \end{proof}
 So among the functions total on the numerals, the line between lift and no lift is
-totality at $\infty$: adding $G\,\omega$, one function without a value there, defeats
+totality at $\infty$: adding $G\,\omega_0$, one function without a value there, defeats
 every lift.
 
 \subsection{At \texorpdfstring{$\mathbb{N}_\infty$}{N-infinity}}\label{sec:natinf}
@@ -565,22 +671,22 @@ numerals and an infinite numeral $\omega$.  Lemma~\ref{lem:sim} generalizes in t
 (\lean{NatFan.simW}): an infinite numeral may be related to \emph{any} term with enough
 successor layers, the right side reducing weakly; and the run may end at any weak head
 normal form $v$, returning a related $v'$.  The second form serves the false case: a
-run of $f\,\omega$ to $\F$ ends at some $K\,x$ with $x\red I$, and the simulation then
+run of $f\,\omega_0$ to $\F$ ends at some $K\,x$ with $x\red I$, and the simulation then
 follows $x$'s run in turn.
-\begin{theorem}[\lean{NatFan.nat\_fan}, \lean{local\_iff\_total\_inf}, \lean{nat\_lift\_inf}]\label{thm:natfan}
-A function total on the numerals and at $\omega$ is $m$-local for some $m$.  Hence, for $f$
-total on the numerals, $f$ has a modulus iff $f\,\omega$ reaches a boolean, and $L_\Nat$
-lifts every $f$ total on the points of $\mathbb{N}_\infty$.
+\begin{theorem}[\lean{NatFan.nat\_fan}, \lean{local\_iff\_total\_inf}, \lean{nat\_lift\_inf'}]\label{thm:natfan}
+A function total on the numerals and at $\omega_0$ is $m$-local for some $m$.  Hence, for
+$f$ total on the numerals, $f$ has a modulus iff $f\,\omega_0$ reaches a boolean, and
+$L_\Nat$ lifts every $f$ total on the points of $\mathbb{N}_\infty$.
 \end{theorem}
 \begin{proof}
-If $f\,\omega$ head-reduces to a boolean in $n$ steps (plus $n'$ for the inner $I$ in the
+If $f\,\omega_0$ head-reduces to a boolean in $n$ steps (plus $n'$ for the inner $I$ in the
 false case), the simulation fixes $f$'s value on every term with at least $n+n'+2$ layers.
 The values on the finitely many numerals below that depth come from totality by finite choice, which needs no axiom of choice.
 \end{proof}
 With Theorem~\ref{thm:sharp}, the $\Nat$ row is settled as a statement about classes:
 $L_\Nat$ lifts every function total on the numerals and at $\infty$, and no closed term
-lifts that class together with $G\,\omega$, which is total on the numerals and has no value
-at $\infty$.
+lifts that class together with $G\,\omega_0$, which is total on the numerals and has no
+value at $\omega_0$ (\lean{NatFan.G\_omega\_no\_value}).
 
 \subsection{At Cantor space}\label{sec:fancantor}
 At Cantor space the answer depends on which points count: totality on the definable
@@ -625,7 +731,8 @@ whatever its tail (\lean{OracleFan.simO}).  Hence $F$ has a \emph{pointwise modu
 at every $\alpha$: a length $n_\alpha$ such that $F$ returns its value at $\alpha$ on
 every term that shares the first $n_\alpha$ bits of $\alpha$ (\lean{oracle\_local}).
 \begin{theorem}[\lean{OracleFan.cantor\_fan}, \lean{cantor\_lift\_oracle}]\label{thm:ofan}
-An oracle-total functional is $m$-local for some $m$, and $L_C$ lifts it.
+An oracle-total functional is $m$-local for some $m$, and $L_C$ lifts it, agreeing with it
+on every term with a prefix of length $m$, in particular on every definable stream.
 \end{theorem}
 \begin{proof}
 The fan theorem (\lean{OracleFan.fan}, proved by K\"onig's lemma) turns the pointwise
@@ -638,38 +745,43 @@ of $w$.  This is an inductive bar, the statement that $F$'s query tree is well-f
 Constructively, being barred at the empty word is equivalent to having a modulus
 (\lean{OracleBar.obar\_iff\_local}).  The fan step then factors into three parts
 (\lean{cantor\_fan\_bar}):
-\begin{itemize}
+\begin{enumerate}
 \item from runs to pointwise moduli, by the simulation (constructive);
 \item from pointwise moduli to a bar, by the fan theorem for this bar
-    (\lean{pointwise\_obar}; classical, the only such step);
+    (\lean{pointwise\_obar}; the only classical step of the factorization);
 \item from the bar to a table (constructive).
-\end{itemize}
+\end{enumerate}
 
 Passing to the term model does not remove the middle step; it makes the step fail.
 Theorem~\ref{thm:ctotal} records the failure: over the definable streams, pointwise
-totality gives no bar, because the Kleene tree above is infinite and has no definable
+totality gives no bar (a bar would give a modulus, \lean{obar\_iff\_local}, and so a lift,
+against Theorem~\ref{thm:ctotal}), because the Kleene tree above is infinite and has no definable
 path.
 
 \subsection{Scope}\label{sec:boundary}
-Sections~\ref{sec:modulus} and~\ref{sec:fan} settle Table~\ref{tab:results} under one
-standard hypothesis, the classical fan theorem in the oracle semantics.  An open question
+Sections~\ref{sec:modulus} and~\ref{sec:fan} settle Table~\ref{tab:results}, using classical
+logic only for the fan theorem in the oracle cell (\lean{OracleFan.fan}, proved with
+\texttt{Classical.choice}).  An open question
 in the $\Nat$ row remains: whether adding \emph{any} function without a value at
 $\infty$ to the functions with a modulus defeats every lift.
 
 %% ---------------------------------------------------------------------------
 \section{Consequences for staged languages}\label{sec:skijack}
 A staged language's data rule should refuse provable functions and admit lifted codes,
-which are data.  A \emph{provable function} is a term that the checker can show, from its syntax and
-the declared types, to be a function: a lambda, a macro, a core, a namespace literal,
-or a combinator, constructor or equation applied to fewer arguments than it takes.
-The guarantee is one-directional: it does not assert that every accepted occupant of a
-data position is a datum \citep{skijack}.
+which are data.  A \emph{provable function} is a term that the checker can show, from its
+syntax and the declared types, to be a function: a lambda, a namespace literal, or the
+name of a macro or a core; a combinator, constructor or equation applied to fewer
+arguments than it takes; or an equation applied to exactly as many, when its body is a
+provable function.  The guarantee is one-directional: it does not assert that every
+accepted operand is a datum \citep{skijack}.
 SKIjack enforces the rule in two stages \citep{skijack}, the first of which is fixed
 here.  Stage A (which formerly decided ``function'' by the presence of binders) decides
 by arity, and refuses an under-applied combinator or equation, or a saturated equation
 whose body is one.  Stage B, a Hindley--Milner discipline over the declared sum types,
-refuses a function that reaches a data position through a bound variable.  With both
-stages, no accepted program has a provable function in a data position.
+refuses a function that reaches an operand of $\mathtt{EQ}$ through a bound variable.  With
+both stages, no accepted program has a provable function as an operand of $\mathtt{EQ}$;
+namespace facts and scry paths are data by their syntax.  These are properties of the
+SKIjack implementation, tested there, not theorems mechanized here.
 
 Because lifted codes are data, $\mathtt{EQ}$ on two of them legitimately decides
 extensional equality of two live functions at the liftable types.  The staging line is
@@ -695,12 +807,14 @@ leave open.
 
 %% ---------------------------------------------------------------------------
 \section{Mechanization}\label{sec:mech}
-All results are in \texttt{lean-ski} \citep{leanski}, on Lean~4.31.  The axiom gate \texttt{\#audit\_clean} admits only
-\texttt{propext} and \texttt{Quot.sound}.  Every module's theorems are in the gate except
-the fan theorem and the results that use it (\lean{OracleFan.fan}, \lean{cantor\_fan},
-\lean{OracleBar.pointwise\_obar}), which add \texttt{Classical.choice}.  The table below
-situates our results by module:
-\begin{center}\small
+All theorems are in \texttt{lean-ski} \citep{leanski}, on Lean~4.31; the claims about
+SKIjack and SKIlark in \S\ref{sec:skijack} describe those artifacts and are not
+theorems.  The axiom gate \texttt{\#audit\_clean} admits only \texttt{propext} and
+\texttt{Quot.sound}.  The theorems we cite are in the gate except the fan theorem and
+everything resting on it (\lean{OracleFan.fan}, \lean{cantor\_fan}, \lean{cantor\_fan\_w},
+\lean{cantor\_lift\_oracle}, \lean{OracleBar.pointwise\_obar}, \lean{cantor\_fan\_bar}),
+which use \texttt{Classical.choice}.  Table~\ref{tab:mech} places the results by module.
+\begin{table}[htb]\centering\small
 \begin{tabular}{@{}ll@{}}
 \toprule
 module & results \\
@@ -718,10 +832,12 @@ module & results \\
 \lean{OracleBar} & the classical step isolated \\
 \bottomrule
 \end{tabular}
-\end{center}
+\caption{Where the results are mechanized, by \texttt{lean-ski} module.}\label{tab:mech}
+\end{table}
 We build recursive terms with \texttt{lean-ski}'s $\fn{FixSelf}$ and bracket
 abstraction over open terms (\lean{absN}); all reasoning is by existential weak reduction, with head
-reduction only inside the simulation.
+reduction only inside the simulation.  The Lean development was written with AI assistance; see the
+Acknowledgements.
 
 %% ---------------------------------------------------------------------------
 \section{Related work}\label{sec:related}
@@ -729,8 +845,8 @@ reduction only inside the simulation.
 \citep{DaviesPfenning2001}.  Kavvos \citep{Kavvos2017,Kavvos2020} gave the intensional
 comonad, Barendregt's no-quote argument, and intensional recursion with the
 G\"odel--L\"ob axiom \citep{Kavvos2021}.  His Q-coalgebras \citep[Def.~33]{Kavvos2017}
-are the abstract form of a behavioral lift; he did not characterize which types carry
-one.  Another factorization impossibility for $SK$ is due to \citet{JayGivenWilson2011};
+are the closest abstract notion; our lifts are a weak analogue of them
+(\S\ref{sec:coalg}), and he did not characterize which types carry one.  Another factorization impossibility for $SK$ is due to \citet{JayGivenWilson2011};
 Jay's tree calculus quotes programs but not computations \citep{Jay2021}.
 \paragraph{Reification.}  Normalization by evaluation
 \citep{BergerSchwichtenberg1991} and type-directed partial evaluation
@@ -755,7 +871,30 @@ combinatory B\"ohm trees \citep{DybjerKuperberg2012} would be its natural home, 
 $\lambda$ the continuity and genericity lemmas \citep[\S14.3]{Barendregt1984} would give
 our step.  The stuttering simulation is a self-contained substitute.
 
+%% ---------------------------------------------------------------------------
+\section{Conclusion}\label{sec:conclusion}
+In every cell of Table~\ref{tab:results}, a behavioral lift exists exactly when
+totality is demanded on a compact point set.  Over $\{S,K,I\}$ the staging line is
+therefore not drawn by types: $\Nat\to\Bool$ lies on both sides of it, according to
+whether a value at $\infty$ is required.  Each cell is proved and mechanized, under
+one hypothesis, the classical fan theorem in the oracle semantics, and over the
+definable streams the Kleene tree shows that the fan step fails.  Two questions remain
+open: whether adding any single function without a value at $\infty$ to the functions
+with a modulus defeats every lift, and where the line falls in calculi with an
+intensional operator, such as SF-calculus and tree calculus.
 
-\bibliographystyle{plainnat}
+
+%% ---------------------------------------------------------------------------
+\section*{Acknowledgements}
+Claude (Anthropic; model Claude Opus 5.5, used through Claude Code) assisted with this
+work in November 2026: drafting and revising the prose, writing and checking Lean proofs
+in \texttt{lean-ski}, searching and checking the literature, and checking the paper's
+claims against the mechanization.  The author directed the research, checked all
+output, and takes responsibility for the content.
+
+\section*{Competing interests}
+The author declares none.
+
+\ifdefined\acmclass\bibliographystyle{ACM-Reference-Format}\else\ifdefined\mscclass\bibliographystyle{msclike}\else\bibliographystyle{plainnat}\fi\fi
 \bibliography{mss}
 \end{document}

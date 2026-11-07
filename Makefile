@@ -1,8 +1,9 @@
-# Build the paper: The Staging Line Is Compactness (LMCS).
+# Build the paper: The Staging Line Is Compactness (ACM TOCL; acmart).
+#   The venue is set at the top of mss.tex: acm (default), msc, lmcs or article.
 #   make          build mss.pdf (latexmk runs pdflatex and bibtex as needed)
 #   make check    build, then report errors, undefined refs/cites, and overfull boxes
 #   make watch    rebuild on every save
-#   make dist     submission tarball: mss.tex, mss.bbl, mss.bib, lmcs.cls
+#   make dist     source tarball: mss.tex, mss.bbl, mss.bib, the class files
 #   make clean    remove build byproducts, keep mss.pdf
 #   make distclean  remove mss.pdf and the tarball too
 
@@ -24,7 +25,7 @@ $(MAIN).pdf: $(SOURCES)
 check: $(MAIN).pdf
 	@echo '--- errors'; grep -n '^!' $(MAIN).log || echo none
 	@echo '--- undefined references and citations'; grep -n -i 'undefined' $(MAIN).log || echo none
-	@echo '--- overfull boxes (the two page-1 vbox overflows come from lmcs.cls)'; grep -n 'Overfull' $(MAIN).log || echo none
+	@echo '--- overfull hboxes (under msc.cls, the class adds harmless per-page overflows)'; grep -n 'Overfull .hbox' $(MAIN).log || echo none
 	@grep -o 'Output written on .*' $(MAIN).log
 
 watch:
