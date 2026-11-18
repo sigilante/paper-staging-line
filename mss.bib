@@ -15,18 +15,39 @@
 @article{Barendregt1991, author = {Henk Barendregt}, title = {Self-Interpretation in Lambda Calculus}, journal = {Journal of Functional Programming}, volume = {1}, number = {2}, pages = {229--233}, year = {1991}}
 @article{DybjerKuperberg2012, author = {Peter Dybjer and Denis Kuperberg}, title = {Formal Neighbourhoods, Combinatory {B}{\"o}hm Trees, and Untyped Normalization by Evaluation}, journal = {Annals of Pure and Applied Logic}, volume = {163}, number = {2}, pages = {122--131}, year = {2012}, doi = {10.1016/j.apal.2011.06.021}}
 @article{DaviesPfenning2001, author = {Rowan Davies and Frank Pfenning}, title = {A Modal Analysis of Staged Computation}, journal = {Journal of the ACM}, volume = {48}, number = {3}, pages = {555--604}, month = may, year = {2001}, doi = {10.1145/382780.382785}}
-@techreport{DaviesPfenning1999, author = {Rowan Davies and Frank Pfenning}, title = {A Modal Analysis of Staged Computation}, institution = {Carnegie Mellon University}, number = {CMU-CS-99-153}, year = {1999}}
 @article{TahaSheard2000, author = {Walid Taha and Tim Sheard}, title = {{MetaML} and Multi-Stage Programming with Explicit Annotations}, journal = {Theoretical Computer Science}, volume = {248}, pages = {211--242}, year = {2000}}
 @phdthesis{Kavvos2017, author = {G. A. Kavvos}, title = {On the Semantics of Intensionality and Intensional Recursion}, school = {University of Oxford}, year = {2017}, note = {arXiv:1712.09302}}
 @article{Kavvos2020, author = {G. A. Kavvos}, title = {Dual-Context Calculi for Modal Logic}, journal = {Logical Methods in Computer Science}, volume = {16}, number = {3}, year = {2020}}
 @article{JayGivenWilson2011, author = {Barry Jay and Thomas Given-Wilson}, title = {A Combinatory Account of Internal Structure}, journal = {Journal of Symbolic Logic}, volume = {76}, number = {3}, pages = {807--826}, year = {2011}}
 @misc{Jay2021, author = {Barry Jay}, title = {Reflective Programs in Tree Calculus}, howpublished = {Self-published}, year = {2021}}
 @inproceedings{BaillonMahboubiPedrot2026, author = {Martin Baillon and Assia Mahboubi and Pierre-Marie P{\'e}drot}, title = {In {C}antor Space No One Can Hear You Stream}, booktitle = {Programming Languages and Systems (ESOP 2026), Part~I}, editor = {Robbert Krebbers}, series = {Lecture Notes in Computer Science}, pages = {72--103}, publisher = {Springer}, year = {2026}, doi = {10.1007/978-3-032-22720-1_4}, address = {Cham}}
-@misc{leanski, author = {N. E. Davis}, title = {lean-ski: {SKI} combinatory logic in {Lean}~4}, howpublished = {Zenodo, \url{https://doi.org/10.5281/zenodo.24024993}}, note = {Version 1.0}, year = {2026}}
-@misc{skijack, author = {N. E. Davis}, title = {{SKIjack}}, howpublished = {\url{https://github.com/sigilante/SKIjack}}, note = {Version 0.2.6}, year = {2026}}
-@unpublished{DavisMeta, author = {N. E. Davis}, title = {A self-interpreter for {$SKI$}: Authoring semantics for new symbols}, note = {Journal of Functional Programming, in review; doi:10.5281/zenodo.22867957}, year = {2027}}
+@misc{leanski, author = {N. E. Davis}, title = {lean-ski: {SKI} combinatory logic in {Lean}~4}, howpublished = {Zenodo, \href{https://doi.org/10.5281/zenodo.24334377}{doi:10.5281/zenodo.24334377}}, note = {Version 1.2}, year = {2026}}
+@misc{skijack, author = {N. E. Davis}, title = {{SKIjack}}, howpublished = {Zenodo, \href{https://doi.org/10.5281/zenodo.24333610}{doi:10.5281/zenodo.24333610}}, note = {Version 0.2.8; on PyPI as \texttt{skijack}}, year = {2026}}
+@article{DavisMeta,
+  author = {N. E. Davis},
+  title = {A Self-Interpreter for {$SKI$}: Authoring Semantics for New Symbols},
+  journal = {Journal of Functional Programming},
+  note = {In review; preprint \href{https://doi.org/10.5281/zenodo.22867957}{doi:10.5281/zenodo.22867957}},
+  year = {2027}
+}
 @article{Kavvos2021, author = {G. A. Kavvos}, title = {Intensionality, Intensional Recursion, and the {G}{\"o}del--{L}{\"o}b Axiom}, journal = {IfCoLog Journal of Logics and their Applications}, volume = {8}, number = {8}, pages = {2287--2312}, month = sep, year = {2021}, note = {Presented at IMLA 2017; arXiv:1703.01288}}
 @book{HindleySeldin2008, author = {J. Roger Hindley and Jonathan P. Seldin}, title = {Lambda-Calculus and Combinators: An Introduction}, publisher = {Cambridge University Press}, address = {Cambridge}, year = {2008}}
 @book{CHS1972, author = {Haskell B. Curry and J. Roger Hindley and Jonathan P. Seldin}, title = {Combinatory Logic, Volume {II}}, publisher = {North-Holland}, address = {Amsterdam}, year = {1972}}
 @article{Leroy2009, author = {Xavier Leroy}, title = {A Formally Verified Compiler Back-end}, journal = {Journal of Automated Reasoning}, volume = {43}, number = {4}, pages = {363--446}, year = {2009}, doi = {10.1007/s10817-009-9155-4}}
-@misc{skilark, author = {N. E. Davis}, title = {{SKIlark}: Joy on {SKIjack}}, howpublished = {\url{https://github.com/sigilante/SKIlark}}, note = {Version 0.11.0; on PyPI as \texttt{skilark-joy}}, year = {2026}}
+@misc{skilark, author = {N. E. Davis}, title = {{SKIlark}: {Joy} on {SKIjack}}, howpublished = {Zenodo, \url{https://doi.org/10.5281/zenodo.24331803}}, note = {Version 0.11.1; on PyPI as \texttt{skilark-joy}}, year = {2026}}
+@inproceedings{Lamport1983,  author    = {Leslie Lamport},
+  title     = {What Good Is Temporal Logic?},
+  booktitle = {Information Processing 83: Proceedings of the IFIP 9th World Computer Congress},
+  editor    = {R. E. A. Mason},
+  publisher = {North-Holland},
+  year      = {1983},
+  pages     = {657--668}
+}
+@inproceedings{vonThunThomas2001, author = {Manfred von Thun and Reuben Thomas}, title = {Joy: Forth's Functional Cousin}, booktitle = {Proceedings of the 17th EuroForth Conference}, year = {2001}, month = oct, url={https://hypercubed.github.io/joy/html/forth-joy.html}}
+@article{DavisND, 
+  author = {N. E. Davis},
+  title = {{SKIjack}: A Low-Level Native Language for the {$SKI$} Calculus},
+  journal = {The Art, Science, and Engineering of Programming},
+  note = {In review},
+  year = {2027}
+}
